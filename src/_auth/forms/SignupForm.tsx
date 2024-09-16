@@ -1,9 +1,12 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 import { SignupSchema } from "@/lib/validation";
+import { useCreateUserAccount, useSignInAccount } from "@/lib/react-query/queriesAndMutations";
+import { useUserContext } from "@/context/AuthContext";
 
 import {
     Form,
@@ -17,10 +20,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import Loader from "@/components/shared/Loader";
 
-import { createUserAccount } from "@/lib/appwrite/api";
-
 const SignupForm = () => {
-    const isLoading = false;
+    const { toast } = useToast()
+    const navigate = useNavigate()
+
+    const { mutateAsync: createUserAccount, isPending: isCreatingUser } = useCreateUserAccount()
+    const { mutateAsync: signInAccount } = useSignInAccount()
+    const { checkAuthUser } = useUserContext()
 
     const form = useForm<z.infer<typeof SignupSchema>>({
         resolver: zodResolver(SignupSchema),
@@ -33,7 +39,29 @@ const SignupForm = () => {
     });
 
     async function onSubmit(values: z.infer<typeof SignupSchema>) {
-        const newUser = await createUserAccount(values);
+
+        try {
+            const newUser = await createUserAccount(values)
+
+            if (!newUser) throw Error
+
+            const session = await signInAccount({ email: values.email, password: values.password })
+
+            if (!session) throw Error
+
+            const isLoggedIn = await checkAuthUser()
+
+            if (!isLoggedIn) throw Error
+
+            form.reset()
+            navigate('/')
+        } catch (error) {
+            console.log(error)
+            return toast({
+                variant: 'destructive',
+                title: 'Sign up failed. Please try again!',
+            })
+        }
     }
 
     return (
@@ -100,9 +128,9 @@ const SignupForm = () => {
                             </FormItem>
                         )}
                     />
-                    <Button type="submit" className="shad-button_primary" disabled={isLoading}>
+                    <Button type="submit" className="shad-button_primary" disabled={isCreatingUser}>
                         {
-                            isLoading ? (
+                            isCreatingUser ? (
                                 <div className="flex-center gap-2">
                                     <Loader />
                                 </div>
@@ -111,7 +139,7 @@ const SignupForm = () => {
                     </Button>
 
                     <p className="text-small-regular text-light-2 text-center mt-2">Already have an account?
-                        <Link to="/sign-in" className="text-primary-500 text-small-semibold ml-1">Log in</Link>
+                        <Link to="/sign-in" className="text-primary-500 text-small-semibold ml-1">Sign in</Link>
                     </p>
                 </form>
             </div>

@@ -10,3 +10,8 @@ export const SignupSchema = z.object({
         .refine((value) => /[a-z]/.test(value), { message: "Password must have at least one lowercase letter" })
         .refine((value) => /[!@#$%^&*(),.?":{}|<>-_]/.test(value), { message: "Password must have at least one special character" })
 })
+
+export const SigninSchema = z.object({
+    email: z.string().email(),
+    password: z.string()
+})
